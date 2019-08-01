@@ -57,23 +57,23 @@ wd = '~/Projects/process_rnaseq_cellines/CMP' #working directory
 setwd(wd)
 
 metasample = '../../00-CMP/metadata/model_list_2019-04-04_0916.csv' #vector containing the path to the metainformation about the cell lines
-# metagene = '../00-CMP/metadata/gene_identifiers_2019-02-19_1024.csv' #vector containing the path to the metainformation about the genes used in the cell model passports, with HUGO, Ensembl, Entrez and Refseq annotation
 rnadata = '../../00-CMP/expression/rnaseq_2019-04-15_1133.csv'#vector containing the path to the RNAseq file of cell lines
 
 
 
 
-###### begin of the preprocessing ######
+###### Loading datasets ######
   
 cat('Load expression data \n')
 cmpRAW <- fread(rnadata, sep = ',')
 
 cat('Load clinics data \n')
 metaSMP <- read.delim(metasample, sep = ',')
-# genes <- read.delim(metagene, sep = ',')
 
 
 
+
+##### Matrix extraction #####
 
 message('Create matrix Gene x Sample \n')
 
@@ -102,6 +102,7 @@ close(pb)
 
 rm(pb, df, dfsub, i, dset, institute, model)
 
+
 cat('Total genes and cell lines: \n')
 print(lapply(EXP_rawcounts, dim))
 # $`Sanger RNASeq`
@@ -123,6 +124,59 @@ EXP_rawcounts[['broad']] <- EXP_rawcounts[['broad']][,-1]
 saveRDS(EXP_rawcounts, file = '1907_release1904/rnaseq_2019-06-26_geneVSmodel_list.rds')
 # EXP_rawcounts <- readRDS('1907_release1904/rnaseq_2019-06-26_geneVSmodel_list.rds')
 
+
+#### Exploration of data
+
+gg.venn <- data.frame(x = c(-0.866, 0.866),
+                      y = c(0, 0),
+                      labels = c('Sanger', 'Broad'))
+
+gg.data.samples <- list(shared = intersect(colnames(EXP_rawcounts$sanger), colnames(EXP_rawcounts$broad)),
+                        sanger = as.character(colnames(EXP_rawcounts$sanger) [ which( !colnames(EXP_rawcounts$sanger)%in%colnames(EXP_rawcounts$broad) ) ]),
+                        broad = as.character(colnames(EXP_rawcounts$broad) [ which( !colnames(EXP_rawcounts$broad)%in%colnames(EXP_rawcounts$sanger) ) ]) )
+
+
+gg.sample <- as.data.frame(matrix(data=NA, nrow=3, ncol = 4, dimnames = list(NULL, c('label', 'x', 'y', 'count'))), stringsAsFactors = F)
+gg.sample$label <- c('shared', 'Sanger', 'Broad')
+gg.sample$x <- c(0, -1.5, 1.5)
+gg.sample$y <- c(0, 0, 0)
+gg.sample$count <- c(length(gg.data.samples$shared), length(gg.data.samples$sanger), length(gg.data.samples$broad))
+
+
+gg.data.genes <- list(shared = intersect(rownames(EXP_rawcounts$sanger), rownames(EXP_rawcounts$broad)),
+                        sanger = as.character(rownames(EXP_rawcounts$sanger) [ which( !rownames(EXP_rawcounts$sanger)%in%rownames(EXP_rawcounts$broad) ) ]),
+                        broad = as.character(rownames(EXP_rawcounts$broad) [ which( !rownames(EXP_rawcounts$broad)%in%rownames(EXP_rawcounts$sanger) ) ]) )
+
+
+gg.genes <- as.data.frame(matrix(data=NA, nrow=3, ncol = 4, dimnames = list(NULL, c('label', 'x', 'y', 'count'))), stringsAsFactors = F)
+gg.genes$label <- c('shared', 'Sanger', 'Broad')
+gg.genes$x <- c(0, -1.5, 1.5)
+gg.genes$y <- c(0, 0, 0)
+gg.genes$count <- c(length(gg.data.genes$shared), length(gg.data.genes$sanger), length(gg.data.genes$broad))
+
+
+
+png('xplr/ven_samples_SB.png', height = 600, width = 600, res = 150)
+ggplot(gg.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) +
+  geom_circle(alpha = .3, size = 1, colour = 'grey') +
+  coord_fixed() +
+  labs(fill = NULL) +
+  theme_void() + theme(legend.position = 'bottom') +
+  annotate("text", x = gg.sample$x, y = gg.sample$y, label = gg.sample$count , size = 10) +
+  ggtitle('Samples CMPs (2019-04-15_1133)') + 
+  scale_fill_manual(values = c('#E69F00', '#009E73',  '#0072B2'))
+dev.off()
+
+png('xplr/ven_samples_SB.png', height = 600, width = 600, res = 150)
+ggplot(gg.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) +
+  geom_circle(alpha = .3, size = 1, colour = 'grey') +
+  coord_fixed() +
+  labs(fill = NULL) +
+  theme_void() + theme(legend.position = 'bottom') +
+  annotate("text", x = gg.genes$x, y = gg.genes$y, label = gg.genes$count , size = 10) +
+  ggtitle('Samples CMPs (2019-04-15_1133)') + 
+  scale_fill_manual(values = c('#E69F00', '#009E73',  '#0072B2'))
+dev.off()
 
 
 
@@ -199,6 +253,7 @@ exp.zero <- lapply(EXP_rawcounts, function(EXP){
 })
 
 saveRDS(exp.zero, file = '1907_release1904/rnaseq_2019-06-26_expZero_list.rds')
+# exp.zero <- readRDS(file = '1907_release1904/rnaseq_2019-06-26_expZero_list.rds')
 
 EXP_rawcounts <- lapply(EXP_rawcounts, function(EXP){
   keep = aveLogCPM(EXP) > 0
@@ -209,6 +264,7 @@ cat('Total genes and cell lines: \n')
 print(lapply(EXP_rawcounts, dim))
 
 saveRDS(EXP_rawcounts, file = '1907_release1904/rnaseq_2019-06-26_rmZeroGenes_list.rds')
+# EXP_rawcounts <- readRDS(file = '1907_release1904/rnaseq_2019-06-26_rmZeroGenes_list.rds')
 
 
 
@@ -237,7 +293,7 @@ saveRDS(EXP_normcounts, file = '1907_release1904/rnaseq_2019-06-26_tmm_norm_list
 message('Voom transformation\n')
 EXP_voom = lapply(EXP_normcounts, function(EXP){voom(EXP, plot = T)$E}) # $E extract the "data corrected for variance"
 saveRDS(EXP_voom, file = '1907_release1904/rnaseq_2019-06-26_voom_list.rds')
-# EXP_voom <- readRDS(file = 'rnaseq_2019-06-26_voom_list.rds')
+# EXP_voom <- readRDS(file = '1907_release1904/rnaseq_2019-06-26_voom_list.rds')
 
 
 
@@ -294,7 +350,7 @@ dev.off()
 
 png('xplr/rnaseq_2019-06-26_PCA.png', height = 800, width = 900, res = 150)
 qplot(exp.pca$x[,1], exp.pca$x[,2], data=catgroup,
-      color= tissue, geom = c('point'), label = dataset,#,'text'
+      color= cancer_type, geom = c('point'), label = dataset,#,'text'
       xlab=paste("PC1, ", round(exp.pca.variances[1], 2), "%"), 
       ylab=paste("PC2, ", round(exp.pca.variances[2], 2), "%"))
 dev.off()
