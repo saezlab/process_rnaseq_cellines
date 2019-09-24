@@ -56,7 +56,8 @@ library(ggfortify)
 wd = '~/Projects/process_rnaseq_cellines/CMP' #working directory
 setwd(wd)
 
-metasample = '../../00-CMP/metadata/model_list_2019-04-04_0916.csv' #vector containing the path to the metainformation about the cell lines
+#metasample = '../../00-CMP/metadata/model_list_2019-04-04_0916.csv' #vector containing the path to the metainformation about the cell lines
+metasample = '../../00-CMP/metadata/model_list_2019-06-21_1535.csv'
 rnadata = '../../00-CMP/expression/rnaseq_2019-04-15_1133.csv'#vector containing the path to the RNAseq file of cell lines
 
 
@@ -103,14 +104,6 @@ close(pb)
 rm(pb, df, dfsub, i, dset, institute, model)
 
 
-cat('Total genes and cell lines: \n')
-print(lapply(EXP_rawcounts, dim))
-# $`Sanger RNASeq`
-# [1] 35004   448
-# 
-# $`Broad (CCLE) RNASeq`
-# [1] 37260   707
-
 # transforming data.table to data.frame 
 names(EXP_rawcounts) <- gsub("Sanger RNASeq", 'sanger', names(EXP_rawcounts))
 names(EXP_rawcounts) <- gsub("Broad \\(CCLE\\) RNASeq", 'broad', names(EXP_rawcounts))
@@ -123,6 +116,14 @@ EXP_rawcounts[['broad']] <- EXP_rawcounts[['broad']][,-1]
 
 saveRDS(EXP_rawcounts, file = '1907_release1904/rnaseq_2019-06-26_geneVSmodel_list.rds')
 # EXP_rawcounts <- readRDS('1907_release1904/rnaseq_2019-06-26_geneVSmodel_list.rds')
+
+print(lapply(EXP_rawcounts, dim))
+# $sanger
+# [1] 35004   447
+# 
+# $broad
+# [1] 37260   706
+
 
 
 #### Exploration of data
