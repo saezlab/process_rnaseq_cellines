@@ -1,9 +1,29 @@
 ---
 title: "Process RNAseq cell lines from Cell Model Passports (CMP)"
-output:
-  html_document:
-    df_print: paged
+author: "Rosa Hernansaiz-Ballesteros"
+output: 
+  github_document: default
 ---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/Projects/cellines-carnival-drugs/process_rnaseq_cellines/CMP' )
+```
+
+### License Info
+
+This program is free software: you can redistribute it and/or modify it under 
+the terms of the GNU General Public License as published by the Free Software 
+Foundation, either version 3 of the License, or (at your option) any later 
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR 
+A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+Please check http://www.gnu.org/licenses/.
+
+## Overview
 
 github repo: saezlab/process_rnaseq_cellines
 
@@ -30,8 +50,9 @@ Steps followed to process the RNAseq:
 
 8. Merging duplicates with the mean
 
+## Getting Started
 
-```{r}
+```{r, message=FALSE, results='hide', warning=FALSE}
 library(data.table)
 library(dplyr)
 library(stringr)
@@ -43,32 +64,26 @@ library(ggplot2)
 library(ggforce)
 library(ggfortify)
 
-###### set paths and variables ######
-
-wd = '~/Projects/process_rnaseq_cellines/CMP' #working directory
-setwd(wd)
-
-#metasample = '../../00-CMP/metadata/model_list_2019-04-04_0916.csv' #vector containing the path to the metainformation about the cell lines
-metasample = '../../00-CMP/metadata/model_list_2019-06-21_1535.csv'
-rnadata = '../../00-CMP/expression/rnaseq_2019-04-15_1133.csv'#vector containing the path to the RNAseq file of cell lines
-
+# raw data
+metasample = '../../../00-CMP/metadata/model_list_2019-04-04_0916.csv' #metainformation about the cell lines
+rnadata = '../../../00-CMP/expression/rnaseq_2019-04-15_1133.csv'#RNAseq file of cell lines
 
 ###### Loading datasets ######
   
-cmpRAW <- fread(rnadata, sep = ',')
+cmpRAW <- data.table::fread(rnadata, sep = ',')
 
-metaSMP <- read.delim(metasample, sep = ',')
+metaSMP <- utils::read.delim(metasample, sep = ',')
 ```
 
-Matrix extraction
+## 1. Matrix extraction
 
 Create a matrix Gene x Sample. As the original dataset from Cell Model Pasports contains samples from 2 different sources (Sanger and Broad),
 the samples are separarated based on the source, as they have different number of genes.
 
-```{r}
+```{r matrixExtraction}
 models <- unique(cmpRAW$model_id) #unique samples
 
-EXP_rawcounts=NULL
+EXP_rawcounts = NULL
 #pb <- txtProgressBar(min = 0, max = length(models), style = 3) # create progress bar
 for (i in 1:length(models)) { #for each of the unique samples
 #  setTxtProgressBar(pb, i) #update progress bar
@@ -89,15 +104,14 @@ for (i in 1:length(models)) { #for each of the unique samples
 
 rm(pb, df, dfsub, i, dset, institute, model)
 
-
 # transforming data.table to data.frame 
 names(EXP_rawcounts) <- gsub("Sanger RNASeq", 'sanger', names(EXP_rawcounts))
 names(EXP_rawcounts) <- gsub("Broad \\(CCLE\\) RNASeq", 'broad', names(EXP_rawcounts))
 
-EXP_rawcounts[['sanger']] <- setDF(EXP_rawcounts[['sanger']], rownames=EXP_rawcounts[['sanger']]$gene_id)
+EXP_rawcounts[['sanger']] <- data.table::setDF(EXP_rawcounts[['sanger']], rownames=EXP_rawcounts[['sanger']]$gene_id)
 EXP_rawcounts[['sanger']] <- EXP_rawcounts[['sanger']][,-1]
 
-EXP_rawcounts[['broad']] <- setDF(EXP_rawcounts[['broad']], rownames=EXP_rawcounts[['broad']]$gene_id)
+EXP_rawcounts[['broad']] <- data.table::setDF(EXP_rawcounts[['broad']], rownames=EXP_rawcounts[['broad']]$gene_id)
 EXP_rawcounts[['broad']] <- EXP_rawcounts[['broad']][,-1]
 
 # saveRDS(EXP_rawcounts, file = '1907_release1904/rnaseq_2019-06-26_geneVSmodel_list.rds')
@@ -158,7 +172,7 @@ ggplot(gg.venn, aes(x0 = x, y0 = y, r = 1.5, fill = labels)) +
 The next steps of the pipleline can be run either by merging the shared samples, or by treating them separately until the normalization phase.
 The raw counts distribution and the sequencing depth is different between both datasets, so they will be merge after the normalitation.
 
-```{r}
+```{r explore_data}
 #### Exploratory analysis of the raw counts distribution and the sequencing depth ####
 
 # Raw counts distribution
@@ -176,7 +190,9 @@ barplot(colSums(EXP_rawcounts$broad), main = 'Cell lines raw counts Broad', xlab
 
 ```
 
-2 and 3. Remove samples with unknown tissue and imput 0 to NA values. There are no samples with unknown tissue or with NA values.
+## 2 and 3. Removing samples with unknown tissue and NA imputing value
+
+There are no samples with unknown tissue or with NA values.
 
 ```{r}
 
@@ -201,7 +217,9 @@ print(lapply(EXP_rawcounts, dim))
 
 ```
 
-4. Removing non-expressed genes with average CPM <=0. The limma-voom method assumes that rows with zero or very low counts have been removed
+## 4. Removing non-expressed genes with average CPM <=0. 
+
+The limma-voom method assumes that rows with zero or very low counts have been removed
 
 ```{r}
 
@@ -225,9 +243,11 @@ print(lapply(EXP_rawcounts, dim))
 # EXP_rawcounts <- readRDS(file = '1907_release1904/rnaseq_2019-06-26_rmZeroGenes_list.rds')
 ```
 
-5. Normalization through TMM method. Although it is also possible to give a matrix of counts directly to voom without TMM normalization, limma package reommends it. "TMM" is the weighted trimmed mean of M-values (to the reference) proposed by Robinson and Oshlack (2010), where the weights are from the delta method on Binomial data. If refColumn is unspecified, the library whose upper quartile is closest to the mean upper quartile is used.
+## 5 and 6. Normalization through TMM method and Voom transformation
 
-6. Voom transformation
+Although it is also possible to give a matrix of counts directly to voom without TMM normalization, limma package reommends it. 
+**TMM** is the weighted trimmed mean of M-values (to the reference) proposed by Robinson and Oshlack (2010), where the weights are from the delta method on Binomial data.
+If refColumn is unspecified, the library whose upper quartile is closest to the mean upper quartile is used.
 
 ```{r}
 EXP_rawcounts = lapply(EXP_rawcounts, function(EXP){DGEList(counts=EXP,genes=rownames(EXP))})
@@ -239,7 +259,9 @@ EXP_voom = lapply(EXP_normcounts, function(EXP){voom(EXP, plot = T)$E}) # $E ext
 
 ```
 
-7. Batch correction of voom transformed data using ComBat. Using "tisue" and duplicates as covariates
+## 7. Batch correction of voom transformed data using ComBat. 
+
+We use "tisue" and duplicates as covariates
 
 ```{r}
 
@@ -304,10 +326,9 @@ saveRDS(EXP_corvoom, file = '1907_release1904/rnaseq_2019-06-26_voom_batchcor.rd
 
 ```
 
+## 8. Merging duplicates with the mean
 
-8.Merging duplicates with the mean
-
-```{r}
+```{r, message=FALSE, warning=FALSE}
 
 exp.pca <- prcomp(t(EXP_corvoom))
 str(exp.pca)
@@ -341,4 +362,10 @@ for( s in samples){
 EXPmerged = X
 #saveRDS(EXPmerged, file = '1907_release1904/rnaseq_2019-06-26_voom_batchcor_merged.rds')
 
+```
+
+## Session Info Details
+
+```{r sessionInfo, echo=FALSE, eval=TRUE}
+sessionInfo()
 ```
